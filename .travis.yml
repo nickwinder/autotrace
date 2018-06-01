@@ -46,5 +46,6 @@ before_script:
 
 script:
         - make
-        - LD_LIBRARY_PATH=.libs ldd .libs/autotrace || true 
+        - test "$TRAVIS_OS_NAME" = osx   && LD_LIBRARY_PATH=.libs otool -L .libs/autotrace || true
+        - test "$TRAVIS_OS_NAME" = linux && LD_LIBRARY_PATH=.libs ldd .libs/autotrace || true
         - ./autotrace -v
