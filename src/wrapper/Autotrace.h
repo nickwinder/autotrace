@@ -11,11 +11,9 @@
 
 #include <string>
 
-constexpr auto DEFAULT_FORMAT = "eps";
-
 class Autotrace {
 public:
-  Autotrace(const std::string &inputFile, const std::string &outputFile, const Options &options);
+  Autotrace(std::string inputFile, std::string outputFile, Options options);
 
   nonstd::expected<void, std::string> produceOutput();
 

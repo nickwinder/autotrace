@@ -13,13 +13,15 @@
 
 using namespace json11;
 
-const std::string assetPath = ASSET_PATH; // NOLINT
-const auto inputPath = assetPath + "Test.png"; // NOLINT
-const auto outputPath = assetPath + "test.svg"; //NOLINT
+namespace {
+const std::string assetPath = ASSET_PATH;        // NOLINT
+const auto inputPath = assetPath + "Test.png";   // NOLINT
+const auto outputPath = assetPath + "test.svg";  // NOLINT
+}
 
 struct Result {
-    bool success;
-    std::string error;
+  bool success;
+  std::string error;
 };
 
 struct ResultULongLong {
@@ -28,8 +30,15 @@ struct ResultULongLong {
   unsigned long value;
 };
 
-Result autotraceRun(const uintptr_t inputBuffer, const size_t inputBufferSize,
-                    const std::string &fittingOptionsJson, const std::string &inputOptionsJson,
+struct ResultVectorUint8 {
+  bool success;
+  std::string error;
+  std::vector<uint8_t> value;
+};
+
+Result autotraceRun(const std::vector<uint8_t> &inputBuffer,
+                    const std::string &fittingOptionsJson,
+                    const std::string &inputOptionsJson,
                     const std::string &outputOptionsJson) {
   std::string jsonError;
   auto jsonResult = Json::parse(fittingOptionsJson, jsonError, STANDARD);
@@ -51,7 +60,8 @@ Result autotraceRun(const uintptr_t inputBuffer, const size_t inputBufferSize,
   OutputOptions outputOptions{jsonResult};
 
   std::ofstream inputFile(inputPath, std::ofstream::binary);
-  inputFile.write(reinterpret_cast<const char *const>(inputBuffer), inputBufferSize);
+  inputFile.write(reinterpret_cast<const char *>(inputBuffer.data()),
+                  inputBuffer.size());
   inputFile.close();
 
   Options options{fittingOptions, inputOptions, outputOptions};
@@ -66,15 +76,12 @@ ResultULongLong outputFileSize() {
   return {true, "", static_cast<unsigned long>(in.tellg())};
 }
 
-Result getOutputFile(const uintptr_t outputBuffer, const size_t outputBufferSize) {
-  if (outputBufferSize < outputFileSize().value) {
-    return {false, "Buffer is to small to receive the file"};
-  }
+ResultVectorUint8 getOutputFile() {
   std::ifstream in(outputPath, std::ifstream::binary);
+  std::vector<uint8_t> outputBuffer((std::istreambuf_iterator<char>(in)),
+                                 std::istreambuf_iterator<char>());
 
-  in.read(reinterpret_cast<char *>(outputBuffer), outputBufferSize);
-
-  return {true, ""};
+  return {true, "", outputBuffer};
 }
 
 #ifdef EMSCRIPTEN
@@ -83,25 +90,31 @@ Result getOutputFile(const uintptr_t outputBuffer, const size_t outputBufferSize
 using namespace emscripten;
 
 EMSCRIPTEN_BINDINGS(autotraceCpp) {
+  register_vector<uint8_t>("VectorUint8");
+
   value_object<Result>("Result")
-    .field("success", &Result::success)
-    .field("error", &Result::error)
-    ;
+      .field("success", &Result::success)
+      .field("error", &Result::error);
 
   value_object<ResultULongLong>("ResultULongLong")
-    .field("success", &ResultULongLong::success)
-    .field("error", &ResultULongLong::error)
-    .field("value", &ResultULongLong::value)
-    ;
+      .field("success", &ResultULongLong::success)
+      .field("error", &ResultULongLong::error)
+      .field("value", &ResultULongLong::value);
 
-  function("autotraceRun", &autotraceRun, allow_raw_pointers());
-  function("getOutputFile", &getOutputFile, allow_raw_pointers());
+  value_object<ResultVectorUint8>("ResultVectorUint8")
+      .field("success", &ResultVectorUint8::success)
+      .field("error", &ResultVectorUint8::error)
+      .field("value", &ResultVectorUint8::value);
+
+  function("autotraceRun", &autotraceRun);
+  function("getOutputFile", &getOutputFile);
   function("outputFileSize", &outputFileSize);
 }
 #else
 
 int main() {
-  const FittingOptions fittingOptions = FittingOptionsBuilder::builder().build();
+  const FittingOptions fittingOptions =
+      FittingOptionsBuilder::builder().build();
   const InputOptions inputOptions = InputOptionsBuilder::builder().build();
   const OutputOptions outputOptions = OutputOptionsBuilder::builder().build();
 
@@ -110,8 +123,8 @@ int main() {
   const auto outputResult = autotrace.produceOutput();
   if (!outputResult.has_value()) {
     std::cout << outputResult.error();
-        return 1;
-    }
+    return 1;
+  }
   return 0;
 }
 

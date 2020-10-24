@@ -4,8 +4,10 @@
 
 #include "Autotrace.h"
 
-Autotrace::Autotrace(const std::string &inputFile, const std::string &outputFile, const Options &options) : inputFile(
-    inputFile), outputFilePath(outputFile), options(options) {
+#include <utility>
+
+Autotrace::Autotrace(std::string inputFile, std::string outputFile, Options options) : inputFile(std::move(
+    inputFile)), outputFilePath(std::move(outputFile)), options(std::move(options)) {
   autotrace_init();
 }
 
